@@ -1,0 +1,4 @@
+numpy
+scipy
+requests
+git+https://github.com/ljaquier/gpx2strava.git
