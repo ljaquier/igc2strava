@@ -1,4 +1,2 @@
-numpy
-scipy
-requests
-git+https://github.com/ljaquier/gpx2strava.git
+scipy==1.16.3
+gpx2strava @ git+https://github.com/ljaquier/gpx2strava.git@1.0.0
