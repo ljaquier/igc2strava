@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from gpx2strava import gpx2strava, utils
 
 
-def get_details(igc_parser, tracklog):
+def get_score(tracklog):
     scoring_rules = {
         "flat": {"multiplier": 1.2},
         "FAI": {"multiplier": 1.4},
@@ -12,46 +12,45 @@ def get_details(igc_parser, tracklog):
         "freeFlight": {"multiplier": 1.0},
         "outReturn": {"multiplier": 1.2}
     }
-    scorer = XCScorer(tracklog, scoring_rules)
-    score = scorer.score_flight(track_optimization=True)
+    return XCScorer(tracklog, scoring_rules).score_flight(track_optimization=True)
 
+def get_type_name(score):
     return {
-        'score': score['score'],
-        'distance': score['properties']['total_distance'],
-        'type': score['triangle_type'] if score['type'] == 'triangle' else score['type'],
-        'glider': igc_parser.glider_type,
-        'lowest_point': min(tracklog, key=lambda point: point.alt),
-        'highest_point': max(tracklog, key=lambda point: point.alt),
-        'first_point': tracklog[0],
-        'last_point': tracklog[-1]
-    }
-
-def get_title(details):
-    types = {
         "flat": "Flat triangle",
         "FAI": "FAI triangle",
         "closedFAI": "Closed FAI triangle",
         "closedFlat": "Closed flat triangle",
         "free_distance": "Free flight"
-    }
-    return f"🪂 Paragliding / {types[details['type']]}"
+    }[score['triangle_type'] if score['type'] == 'triangle' else score['type']]
 
-def get_description(details):
-    return (
-        f"XC distance: {details['distance']:.2f} km\n"
-        f"XC score: {details['score']:.2f} pts\n"
-        +
-        (f"Glider: {details['glider']}\n" if details['glider'] else "")
-        +
-        "\n"
-        f"Takeoff: {details['first_point'].alt:.0f} m\n"
-        f"Max alt.: {details['highest_point'].alt:.0f} m\n"
-        f"Min alt.: {details['lowest_point'].alt:.0f} m\n"
-        f"Landing: {details['last_point'].alt:.0f} m"
-    )
+def get_title(score):
+    return f"🪂 Paragliding / {get_type_name(score)}"
 
-def get_gpx(igc_parser, tracklog):
-    details = get_details(igc_parser, tracklog)
+def get_description(igc_parser, tracklog, score):
+    description = f"XC distance: {score['properties']['total_distance']:.2f} km\n"
+    description += f"XC score: {score['score']:.2f} pts\n"
+    if igc_parser.glider_type:
+        description += f"Glider: {igc_parser.glider_type}\n"
+    description += "\n"
+
+    description += f"Takeoff: {tracklog[0].alt:.0f} m\n"
+    description += f"Max alt.: {max(tracklog, key=lambda point: point.alt).alt:.0f} m\n"
+    description += f"Min alt.: {min(tracklog, key=lambda point: point.alt).alt:.0f} m\n"
+    description += f"Landing: {tracklog[-1].alt:.0f} m\n"
+    description += "\n"
+
+    max_climb = next((int(comment.split(":")[1])/100 for comment in igc_parser.comments if 'SKYDROP-CLIMB-MAX-cm' in comment), None)
+    if max_climb:
+        description += f"Max climb: {max_climb:.2f} m/s\n"
+    max_sink = next((int(comment.split(":")[1])/100 for comment in igc_parser.comments if 'SKYDROP-SINK-MAX-cm' in comment), None)
+    if max_sink:
+        description += f"Max sink: {max_sink:.2f} m/s"
+
+    return description.strip()
+
+def get_gpx(igc_parser):
+    tracklog = igc_parser.parse()
+    score = get_score(tracklog)
 
     track_points = []
     for point in tracklog:
@@ -65,8 +64,8 @@ def get_gpx(igc_parser, tracklog):
         )
 
     return gpx2strava.get_gpx(
-        get_title(details),
-        get_description(details),
+        get_title(score),
+        get_description(igc_parser, tracklog, score),
         'Workout',
         track_points
     )
@@ -80,14 +79,12 @@ if __name__ == "__main__":
     parser.add_argument('igc_file', nargs='?', help='IGC file')
 
     args = parser.parse_args()
-
     if args.config_file and args.igc_file:
         config = utils.load_json(args.config_file)
 
         igc_parser = IGCParser(args.igc_file)
-        tracklog = igc_parser.parse()
-
-        response = gpx2strava.upload_to_strava(gpx2strava.get_access_token(config), get_gpx(igc_parser, tracklog))
+        
+        response = gpx2strava.upload_to_strava(gpx2strava.get_access_token(config), get_gpx(igc_parser))
         print(f"{args.igc_file} : {response.status_code} : {response.text}")
 
         utils.save_json(args.config_file, config)

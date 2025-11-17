@@ -1115,6 +1115,7 @@ class IGCParser:
         self.glider_type = ""
         self.date = None
         self.flight_metadata = {}
+        self.comments = []
 
     def parse(self) -> List:
         """Parse the IGC file and return track points with necessary attributes"""
@@ -1143,6 +1144,10 @@ class IGCParser:
             # H records contain header information
             elif record_type == 'H':
                 self._parse_h_record(line)
+
+            # L records contain comments
+            elif record_type == 'L':
+                self.comments.append(line)
 
         # Convert list of dict to list of objects with attributes
         tracklog = []
@@ -1219,7 +1224,7 @@ class IGCParser:
     def _parse_h_record(self, line: str) -> None:
         """Parse a header record"""
         if line.startswith('HFDTE'):
-            # Parse time
+            # Parse date
             days = int(line[5:7])
             months = int(line[7:9])
             years = 2000+int(line[9:11])
@@ -1227,12 +1232,11 @@ class IGCParser:
 
         if line.startswith('HFPLTPILOTINCHARGE:'):
             # Parse pilot name
-            self.pilot_name = line[len('HFPLTPILOTINCHARGE:'):].strip()
+            self.pilot_name = line[19:].strip()
 
         if line.startswith('HFGTYGLIDERTYPE:'):
             # Parse glider type
-            self.glider_type = line[len('HFGTYGLIDERTYPE:'):].strip()
-
+            self.glider_type = line[16:].strip()
 
 def process_igc_file(file_path: str, scoring_rules: Dict, optimization=False) -> Dict:
     """
