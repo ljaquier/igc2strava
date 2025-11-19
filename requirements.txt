@@ -1,2 +1,2 @@
 scipy==1.16.3
-gpx2strava @ git+https://github.com/ljaquier/gpx2strava.git@1.0.0
+gpx2strava @ git+https://github.com/ljaquier/gpx2strava.git@2.0.0
