@@ -1225,10 +1225,10 @@ class IGCParser:
         """Parse a header record"""
         if line.startswith('HFDTE'):
             # Parse date
-            days = int(line[5:7])
-            months = int(line[7:9])
-            years = 2000+int(line[9:11])
-            self.date = datetime.date(years, months, days)
+            date=line[5:]
+            if date.startswith('DATE:'):
+                date=date[5:].strip()
+            self.date = datetime.date(2000+int(date[4:6]), int(date[2:4]), int(date[0:2]))
 
         if line.startswith('HFPLTPILOTINCHARGE:'):
             # Parse pilot name
